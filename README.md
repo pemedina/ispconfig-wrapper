@@ -19,11 +19,9 @@ The *only* change is that every response is returned as a json encoded array.
  +  Single value responses are converted to json , wrapped as `result`.
  + Array responses are converted to json.
 
-## Composer
+## Install
 
-```bash
-$ composer require pemedina/ispconfig-wrapper 1.*
-```
+`git clone` this repository.
 
 ## Usage
 
@@ -53,7 +51,7 @@ $result = $ispconfig
 print_r json_decode( $result ));
 ```
 
-### Standard Usage.
+### Standard Syntax.
 
 ``` php
 
