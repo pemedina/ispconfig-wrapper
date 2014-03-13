@@ -9,6 +9,7 @@
         }
     ],
     "description": "A simple wrapper for ISPConfig3 Remote API. ",
+    "version": "1.0.0",
     "require": {
         "php": ">=5.3.0"
     }
