@@ -69,7 +69,7 @@ $ispconfig = new ISPConfigWS();
 ...
 ...
 $ispconfig->init($config);
-$ispconfig->setParameters( $parameters );
+$ispconfig->setParams( $parameters );
 $ispconfig->getClient();
 
 print_r json_decode( $ispconfig->getResponse() ));
