@@ -1,0 +1,8 @@
+{
+    "name": "pemedina/ispconfig-wrapper",
+    "description": "A simple wrapper for ISPConfig3 Remote API. ",
+    "require": {
+        "php": ">=5.3.0",
+        "another-vendor/package": "1.*"
+    }
+}
