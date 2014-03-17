@@ -19,9 +19,11 @@ The *only* change is that every response is returned as a json encoded array.
  +  Single value responses are converted to json , wrapped as `result`.
  + Array responses are converted to json.
 
-## Install
+## Composer
 
-`git clone` this repository.
+```bash
+$ composer require pemedina/ispconfig-wrapper 1.*
+```
 
 ## Usage
 
@@ -33,44 +35,60 @@ The wrapper can be included & used on any PHP application.
 
 ``` php
 <?php
-$config = array(
-    "host"=> "http://192.168.0.55:8080",
-    "user"=> "admin",
-    "pass"=> "password"
+$webService = new ISPConfigWS(
+    new \SoapClient(NULL,
+        array('location'   => 'http://192.168.0.55/remote/index.php',
+              'uri'        => 'http://192.168.0.55/remote/',
+              'exceptions' => 0)
+    )
 );
 
-$ispconfig = new ISPConfigWS($config);
+// Login
+$webService
+    ->with(array('loginUser' => 'admin', 'loginPass' => 'password'))
+    ->login();
 
 
-$result = $ispconfig
-             ->with(array('client_id'=>5))
-             ->getClient()
-             ->response()
-        )
+$result = $webService
+            ->with(array('client_id' => 5))
+            ->getClient()
+            ->response();
+
+print_r json_decode( $result ));
+
+// Single call
+
+$result = $webService
+            ->with(array('loginUser' => 'admin', 'loginPass' => 'password, 'password' => 'newPass', 'client_id' => 5))
+            ->changeClientPassword()
+            ->response();
 
 print_r json_decode( $result ));
 ```
 
-### Standard Syntax.
+### Standard Usage.
 
 ``` php
 
 <?php
-$config = array(
-    "host"=> "http://192.168.0.55:8080",
-    "user"=> "admin",
-    "pass"=> "password"
+$webService = new ISPConfigWS(
+    new \SoapClient(NULL,
+        array('location'   => 'http://192.168.0.55/remote/index.php',
+              'uri'        => 'http://192.168.0.55/remote/',
+              'exceptions' => 0)
+    )
 );
 
+$loginDetail = array('loginUser' => 'admin', 'loginPass' => 'password');
+$webService->setParameters( $loginDetails );
+$webService->login();
+...
+...
 $parameters = array('client_id' => 5);
-$ispconfig = new ISPConfigWS();
-...
-...
-$ispconfig->init($config);
-$ispconfig->setParams( $parameters );
-$ispconfig->getClient();
+$webService->setParameters( $parameters );
+$webService->getClient();
 
-print_r json_decode( $ispconfig->getResponse() ));
+print_r json_decode( $webService->getResponse() ));
 ```
 
 ## Feedback and questions

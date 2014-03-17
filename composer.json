@@ -8,9 +8,13 @@
             "homepage": "https://github.com/pemedina/ispconfig-wrapper"
         }
     ],
-    "description": "A simple wrapper for ISPConfig3 Remote API. ",
-    "version": "1.0.0",
+    "description": "A simple wrapper for ISPConfig 3 Remote API. ",
+    "autoload": {
+        "psr-0": {
+            "ISPConfig-wrapper": "src"
+        }
+    },
     "require": {
-        "php": ">=5.3.0"
+        "php": ">=5.2.0"
     }
 }
