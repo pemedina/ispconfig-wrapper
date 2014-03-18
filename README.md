@@ -59,7 +59,7 @@ print_r json_decode( $result ));
 // Single call
 
 $result = $webService
-            ->with(array('loginUser' => 'admin', 'loginPass' => 'password, 'password' => 'newPass', 'client_id' => 5))
+            ->with(array('loginUser' => 'admin', 'loginPass' => 'password', 'password' => 'newPass', 'client_id' => 5))
             ->changeClientPassword()
             ->response();
 
