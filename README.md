@@ -8,7 +8,7 @@ Designed to interoperate with ISPConfig 3, it aims to provide an expressive yet 
 
 ## Requirements
 
-* PHP >= 5.4.0 (with [soap](http://se2.php.net/soap) support)
+* PHP >= 5.3.0 (with [soap](http://se2.php.net/soap) support)
 
 ## Getting started
 
