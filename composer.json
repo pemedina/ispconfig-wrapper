@@ -1,20 +1,25 @@
 {
-    "name": "pemedina/ispconfig-wrapper",
-    "keywords": ["PHP", "ISPConfig", "wrapper"],
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "Pablo Medina",
-            "homepage": "https://github.com/pemedina/ispconfig-wrapper"
-        }
-    ],
-    "description": "A simple wrapper for ISPConfig 3 Remote API. ",
-    "autoload": {
-        "psr-0": {
-            "ISPConfig-wrapper": "src"
-        }
-    },
-    "require": {
-        "php": ">=5.2.0"
+  "name": "pemedina/ispconfig-wrapper",
+  "description": "A simple wrapper for ISPConfig 3 Remote API. ",
+  "keywords": [
+    "PHP",
+    "ISPConfig",
+    "wrapper"
+  ],
+  "license": "MIT",
+  "minimum-stability": "dev",
+  "authors": [
+    {
+      "name": "Pablo Medina",
+      "homepage": "https://github.com/pemedina/ispconfig-wrapper"
     }
+  ],
+  "autoload": {
+    "psr-0": {
+      "ISPConfigWrapper": "src/"
+    }
+  },
+  "require": {
+    "php": ">=5.4.0"
+  }
 }

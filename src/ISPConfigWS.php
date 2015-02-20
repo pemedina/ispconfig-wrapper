@@ -1,4 +1,4 @@
-<?php
+<?php namespace ISPConfigWrapper;
 
 /**
  * ISPConfig 3 API wrapper PHP
@@ -9,14 +9,6 @@ class ISPConfigWS
 {
 
     /**
-     * Holds the SOAPclient object
-     *
-     * access protected;
-     * @var \SOAPclient
-     */
-    private $webService;
-
-    /**
      * Holds the SOAP session ID
      *
      * access protected;
@@ -24,12 +16,12 @@ class ISPConfigWS
      */
     protected $sessionId;
     /**
-     * Holds the ISPConfig login details
+     * Holds the SOAPclient object
      *
-     * access private;
-     * @var array
+     * access protected;
+     * @var \SOAPclient
      */
-    private $config;
+    private $webService;
 
     /**
      * Holds the SOAP response
@@ -50,38 +42,11 @@ class ISPConfigWS
 
     /**
      *   Sets up \SoapClient connection.
-     * @throws \SoapFault upon SOAP/WDSL error.
+     * @param \SoapClient $soapClient
      */
     public function __construct(\SoapClient $soapClient)
     {
         $this->webService = $soapClient;
-    }
-
-    /**
-     * Get the API ID
-     *
-     * @return string Returns "self"
-     * @access public
-     */
-
-    public function getResponse()
-    {
-        if (is_soap_fault($this->response))
-            return json_encode(array(
-                    'error' => array(
-                        'code'    => $this->response->faultcode,
-                        'message' => $this->response->faultstring
-                    )
-                )
-            );
-
-        if (!is_array($this->response))
-            return json_encode(array(
-                    'result' => $this->response
-                )
-            );
-
-        return json_encode($this->response);
     }
 
     /**
@@ -96,7 +61,35 @@ class ISPConfigWS
     }
 
     /**
+     * Get the API ID
+     *
+     * @return string Returns "self"
+     * @access public
+     */
+
+    public function getResponse()
+    {
+        if (is_soap_fault($this->response))
+            return json_encode([
+                    'error' => [
+                        'code'    => $this->response->faultcode,
+                        'message' => $this->response->faultstring
+                    ]
+                ]
+            );
+
+        if (!is_array($this->response))
+            return json_encode([
+                    'result' => $this->response
+                ]
+            );
+
+        return json_encode($this->response);
+    }
+
+    /**
      * Alias for setParams
+     * @param $params
      * @return $this
      * @access public
      */
@@ -119,6 +112,16 @@ class ISPConfigWS
     }
 
     /**
+     * @return $this
+     */
+    public function addClient()
+    {
+        $reseller_id    = $this->extractParameter('reseller_id');
+        $this->response = $this->ws()->client_add($this->sessionId, $reseller_id, $this->params);
+        return $this;
+    }
+
+    /**
      * Extracts a parameter from $params and remove it from $params array
      *
      * @param $param
@@ -136,11 +139,11 @@ class ISPConfigWS
      * Holds the SOAPclient, creating it if needed.
      *
      * @access private
-     * @return SoapClient
+     * @return \SoapClient
      */
     private function ws()
     {
-        if ( !$this->sessionId)
+        if (!$this->sessionId)
             $this->login();
 
         return $this->webService;
@@ -154,17 +157,6 @@ class ISPConfigWS
         $user            = $this->extractParameter('loginUser');
         $password        = $this->extractParameter('loginPass');
         $this->sessionId = $this->webService->login($user, $password);
-        return $this;
-    }
-
-
-    /**
-     * @return $this
-     */
-    public function addClient()
-    {
-        $reseller_id    = $this->extractParameter('reseller_id');
-        $this->response = $this->ws()->client_add($this->sessionId, $reseller_id, $this->params);
         return $this;
     }
 

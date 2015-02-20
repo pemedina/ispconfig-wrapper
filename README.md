@@ -4,11 +4,11 @@
 
 A simple wrapper for ispconfig3 remote API.
 
-Designed to interoperate with ISPConfig 3, it aims to provide an expresive yet simple interface to perform all actions provided by the API.
+Designed to interoperate with ISPConfig 3, it aims to provide an expressive yet simple interface to perform all actions provided by the API.
 
 ## Requirements
 
-* PHP >= 5.0.0 (with [soap](http://se2.php.net/soap) support)
+* PHP >= 5.4.0 (with [soap](http://se2.php.net/soap) support)
 
 ## Getting started
 
