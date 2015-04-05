@@ -79,7 +79,7 @@ $webService = new ISPConfigWS(
     )
 );
 
-$loginDetail = array('loginUser' => 'admin', 'loginPass' => 'password');
+$loginDetails = array('loginUser' => 'admin', 'loginPass' => 'password');
 $webService->setParameters( $loginDetails );
 $webService->login();
 ...
