@@ -9,7 +9,7 @@ class ISPConfigWSTest extends \PHPUnit_Framework_TestCase
 {
 
     protected $webService;
-    protected $webServiceMethods = array(
+    protected static $webServiceMethods = array(
         'client_add',
         'client_change_password',
         'client_delete',
@@ -205,12 +205,9 @@ class ISPConfigWSTest extends \PHPUnit_Framework_TestCase
     {
 
         $this->webService = $this->getMockBuilder('\SoapClient')
-            ->setMethods( $this->webServiceMethods)
+            ->setMethods( self::$webServiceMethods)
             ->disableOriginalConstructor()
             ->getMock();
-
-        // Configure the stub.
-
     }
 
     public function testLoginOk()
