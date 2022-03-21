@@ -1,1401 +1,1785 @@
-<?php namespace ISPConfigWrapper;
+<?php
+
+namespace ISPConfigWrapper;
+
+use SOAPclient;
 
 /**
- * ISPConfig 3 API wrapper PHP
+ * ISPConfig 3 API wrapper PHP.
+ *
  * @author Pablo Medina <pablo.medina@gmail.com>
  * @license http://opensource.org/licenses/mit-license.php The MIT License
  */
 class ISPConfigWS
 {
-
     /**
-     * Holds the SOAP session ID
+     * Holds the SOAPclient object.
      *
      * access protected;
-     * @var integer
-     */
-    protected $sessionId;
-    /**
-     * Holds the SOAPclient object
      *
-     * access protected;
-     * @var \SOAPclient
+     * @var \SOAPclient|null
      */
-    private $webService;
+    protected ?SOAPclient $client = null;
 
     /**
-     * Holds the SOAP response
+     * Holds the SOAP session ID.
+     *
+     * access protected;
+     *
+     * @var int
+     */
+    protected int $sessionId;
+    /**
+     * Holds the ISPConfig login details.
      *
      * access private;
+     *
+     * @var array
+     */
+    private array $config;
+
+    /**
+     * Holds the SOAP response.
+     *
+     * access private;
+     *
      * @var mixed
      */
     private $wsResponse;
 
     /**
-     * Holds the parameters used for SOAP requests
+     * Holds the parameters used for SOAP requests.
      *
      * access private;
+     *
      * @var array
      */
-    private $params;
+    private array $params;
 
-
-    /**
-     *   Sets up \SoapClient connection.
-     * @param \SoapClient $soapClient
-     */
-    public function __construct(\SoapClient $soapClient)
+  /**
+   * @throws \SoapFault
+   */
+  public function __construct(array $config = array())
     {
-        $this->webService = $soapClient;
+        if (count($config) !== 0) {
+            $this->init($config);
+        }
+    }
+
+  /**
+   * @param  array  $config
+   *
+   * @throws \SoapFault
+   */
+    public function init(array $config = array())
+    {
+        if (count($config) !== 0) {
+            $this->config = $config;
+        }
+
+        $this->client = new SoapClient(
+            null,
+            array('location' => $this->config['host'].'/remote/index.php',
+                  'uri' => $this->config['host'].'/remote/',
+                  'trace' => 1,
+                  'allow_self_siged' => 1,
+                  'exceptions' => 0, )
+        );
+        $this->sessionId = $this->client->login($this->config['user'], $this->config['pass']);
+    }
+
+  /**
+   * Holds the SOAPclient, creating it if needed.
+   *
+   * @return void
+   * @throws \SoapFault
+   */
+    private function ws(): SOAPclient
+    {
+        if ($this->client instanceof SoapClient) {
+            return $this->client;
+        }
+
+        $this->init();
+
     }
 
     /**
-     * Alias for getResponse
+     * Alias for getResponse.
      *
-     * @return mixed
-     * @access public
+     * @return string
      */
-    public function response()
+    public function response(): string
     {
         return $this->getResponse();
     }
 
     /**
-     * Get the API ID
+     * Get the API ID.
      *
      * @return string Returns "self"
-     * @access public
      */
-
-    public function getResponse()
+    public function getResponse(): string
     {
-        if (is_soap_fault($this->wsResponse))
-        {
-            return json_encode(array(
-                    'error' => array(
-                        'code'    => $this->wsResponse->faultcode,
-                        'message' => $this->wsResponse->faultstring
-                    )
-                )
+        if (is_soap_fault($this->wsResponse)) {
+            return json_encode(
+                array('error' => array(
+                        'code' => $this->wsResponse->faultcode,
+                        'message' => $this->wsResponse->faultstring,
+                )), JSON_FORCE_OBJECT
             );
         }
 
-
-        if (!is_array($this->wsResponse))
-        {
-            return json_encode(array(
-                    'result' => $this->wsResponse
-                )
-            );
-
+        if (!is_array($this->wsResponse)) {
+            return json_encode(array('result' => $this->wsResponse), JSON_FORCE_OBJECT);
         }
 
-        return json_encode($this->wsResponse);
+        return json_encode($this->wsResponse, JSON_FORCE_OBJECT);
     }
 
     /**
-     * Alias for setParams
+     * Alias for setParams.
+     *
      * @param $params
+     *
      * @return $this
-     * @access public
      */
-    public function with($params)
+    public function with($params): ISPConfigWS
     {
         $this->setParams($params);
+
         return $this;
     }
 
     /**
-     * Set the parameters used for SOAP calls
+     * Set the parameters used for SOAP calls.
      *
-     * @param Array $params
+     * @param  array  $params
+     *
      * @internal param mixed $params
-     * @access public
      */
-    public function setParams($params)
+    public function setParams(array $params)
     {
         $this->params = $params;
     }
 
-    /**
-     * @return $this
-     */
-    public function addClient()
+    public function getFunctionsList(): ISPConfigWS
     {
-        $reseller_id      = $this->extractParameter('reseller_id');
+        $this->wsResponse = $this->ws()->get_function_list($this->sessionId);
+
+        return $this;
+    }
+
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addClient(): ISPConfigWS
+    {
+        $reseller_id = $this->extractParameter('reseller_id');
         $this->wsResponse = $this->ws()->client_add($this->sessionId, $reseller_id, $this->params);
+
         return $this;
     }
 
     /**
-     * Extracts a parameter from $params and remove it from $params array
+     * Extracts a parameter from $params and remove it from $params array.
      *
      * @param $param
+     *
      * @return mixed
-     * @access private
      */
     private function extractParameter($param)
     {
-        $parameter = array_key_exists($param, $this->params) ? $this->params[$param] : FALSE;
+        $parameter = array_key_exists($param, $this->params) ? $this->params[$param] : false;
         unset($this->params[$param]);
+
         return $parameter;
     }
 
-    /**
-     * Holds the SOAPclient, creating it if needed.
-     *
-     * @access private
-     * @return \SoapClient
-     */
-    private function ws()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function changeClientPassword(): ISPConfigWS
     {
-        if (!$this->sessionId)
-        {
-            $this->login();
-        }
-
-        return $this->webService;
-    }
-
-    /**
-     * @return $this
-     */
-    public function login()
-    {
-        $user            = $this->extractParameter('loginUser');
-        $password        = $this->extractParameter('loginPass');
-        $this->sessionId = $this->webService->login($user, $password);
-        return $this;
-    }
-
-    /**
-     * @return $this
-     */
-    public function changeClientPassword()
-    {
-        $client_id        = $this->extractParameter('client_id');
-        $password         = $this->extractParameter('password');
+        $client_id = $this->extractParameter('client_id');
+        $password = $this->extractParameter('password');
         $this->wsResponse = $this->ws()->client_change_password($this->sessionId, $client_id, $password);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteClient()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteClient(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->client_delete($this->sessionId, $client_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getClient()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getClient(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->client_get($this->sessionId, $client_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getClientByUsername()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getClientByUsername(): ISPConfigWS
     {
-        $username         = $this->extractParameter('username');
+        $username = $this->extractParameter('username');
         $this->wsResponse = $this->ws()->client_get_by_username($this->sessionId, $username);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getClientID()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   */
+    public function getClientID(): ISPConfigWS
     {
-        $user_id          = $this->extractParameter('user_id');
+        $user_id = $this->extractParameter('user_id');
         $this->wsResponse = $this->ws()->client_get_id($this->sessionId, $user_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getClientSites()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getClientSites(): ISPConfigWS
     {
-        $user_id          = $this->extractParameter('user_id');
+        $user_id = $this->extractParameter('user_id');
         $this->wsResponse = $this->ws()->client_get_sites_by_user($this->sessionId, $user_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getClientTemplates()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getClientTemplates(): ISPConfigWS
     {
-        $user_id          = $this->extractParameter('user_id');
+        $user_id = $this->extractParameter('user_id');
         $this->wsResponse = $this->ws()->client_templates_get_all($this->sessionId, $user_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateClient()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateClient(): ISPConfigWS
     {
-        $client_id  = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $resellerId = $this->extractParameter('reseller_id');
 
         $this->wsResponse = $this->ws()->client_add($this->sessionId, $client_id, $resellerId, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addDnsRecord()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addDnsRecord(): ISPConfigWS
     {
         $client_id = $this->extractParameter('client_id');
-        $call      = 'dns_' . $this->params['type'] . '_add';
+        $call = 'dns_'.$this->params['type'].'_add';
 
         $this->wsResponse = $this->ws()->{$call}($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteDnsRecord()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteDnsRecord(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $call             = 'dns_' . $this->params['type'] . '_delete';
+        $client_id = $this->extractParameter('client_id');
+        $call = 'dns_'.$this->params['type'].'_delete';
         $this->wsResponse = $this->ws()->{$call}($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getDnsRecord()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getDnsRecord(): ISPConfigWS
     {
         $client_id = $this->extractParameter('client_id');
-        $call      = 'dns_' . $this->params['type'] . '_get';
+        $call = 'dns_'.$this->params['type'].'_get';
 
         $this->wsResponse = $this->ws()->$call($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateDnsRecord()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateDnsRecord(): ISPConfigWS
     {
         $client_id = $this->extractParameter('client_id');
-        $call      = 'dns_' . $this->params['type'] . '_update';
+        $call = 'dns_'.$this->params['type'].'_update';
 
         $this->wsResponse = $this->ws()->$call($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addDnsZone()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addDnsZone(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->dns_zone_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteDnsZone()
-    {
-        $zone_id          = $this->extractParameter('zone_id');
-        $this->wsResponse = $this->ws()->dns_zone_delete($this->sessionId, $zone_id);
-        return $this;
-    }
-
-    /**
-     * @return $this
-     */
-    public function getDnsZone()
-    {
-        $zone_id          = $this->extractParameter('zone_id');
-        $this->wsResponse = $this->ws()->dns_zone_get($this->sessionId, $zone_id);
-        return $this;
-    }
-
-    /**
-     * @return $this
-     */
-    public function getDnsZonesByUser()
-    {
-        $client_id        = $this->extractParameter('client_id');
-        $server_id        = $this->extractParameter('server_id');
-        $this->wsResponse = $this->ws()->dns_zone_get_by_user($this->sessionId, $client_id, $server_id);
-        return $this;
-
-    }
-
-    /**
-     * @return $this
-     */
-    public function setDnsZoneStatus()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteDnsZone(): ISPConfigWS
     {
         $zone_id = $this->extractParameter('zone_id');
-        $status  = $this->extractParameter('status');
+        $this->wsResponse = $this->ws()->dns_zone_delete($this->sessionId, $zone_id);
+
+        return $this;
+    }
+
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getDnsZone(): ISPConfigWS
+    {
+        $zone_id = $this->extractParameter('zone_id');
+        $this->wsResponse = $this->ws()->dns_zone_get($this->sessionId, $zone_id);
+
+        return $this;
+    }
+
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getDnsZonesByUser(): ISPConfigWS
+    {
+        $client_id = $this->extractParameter('client_id');
+        $server_id = $this->extractParameter('server_id');
+        $this->wsResponse = $this->ws()->dns_zone_get_by_user($this->sessionId, $client_id, $server_id);
+
+        return $this;
+    }
+
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function setDnsZoneStatus(): ISPConfigWS
+    {
+        $zone_id = $this->extractParameter('zone_id');
+        $status = $this->extractParameter('status');
 
         $this->wsResponse = $this->ws()->dns_zone_set_status($this->sessionId, $zone_id, $status);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateDnsZone()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateDnsZone(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $zone_id          = $this->extractParameter('zone_id');
+        $client_id = $this->extractParameter('client_id');
+        $zone_id = $this->extractParameter('zone_id');
         $this->wsResponse = $this->ws()->dns_zone_update($this->sessionId, $client_id, $zone_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addDnsDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addDnsDomain(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->domains_domain_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteDnsDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteDnsDomain(): ISPConfigWS
     {
-        $domain_id        = $this->extractParameter('domain_id');
+        $domain_id = $this->extractParameter('domain_id');
         $this->wsResponse = $this->ws()->domains_domain_delete($this->sessionId, $domain_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getDnsDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getDnsDomain(): ISPConfigWS
     {
-        $domain_id        = $this->extractParameter('domain_id');
+        $domain_id = $this->extractParameter('domain_id');
         $this->wsResponse = $this->ws()->domains_domain_get($this->sessionId, $domain_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getUserDnsDomains()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getUserDnsDomains(): ISPConfigWS
     {
-        $user_id          = $this->extractParameter('user_id');
+        $user_id = $this->extractParameter('user_id');
         $this->wsResponse = $this->ws()->domains_get_all_by_user($this->sessionId, $user_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailAlias()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailAlias(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_alias_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailAlias()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailAlias(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('alias_id');
+        $primary_id = $this->extractParameter('alias_id');
         $this->wsResponse = $this->ws()->mail_alias_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailAlias()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailAlias(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('alias_id');
+        $primary_id = $this->extractParameter('alias_id');
         $this->wsResponse = $this->ws()->mail_alias_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailAlias()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailAlias(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('alias_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('alias_id');
         $this->wsResponse = $this->ws()->mail_alias_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailBlacklist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailBlacklist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_blacklist_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailBlacklist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailBlacklist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('blacklist_id');
+        $primary_id = $this->extractParameter('blacklist_id');
         $this->wsResponse = $this->ws()->mail_blacklist_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailBlacklist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailBlacklist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('blacklist_id');
+        $primary_id = $this->extractParameter('blacklist_id');
         $this->wsResponse = $this->ws()->mail_blacklist_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailBlacklist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailBlacklist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('blacklist_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('blacklist_id');
         $this->wsResponse = $this->ws()->mail_blacklist_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailCatchall()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailCatchall(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_catchall_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailCatchall()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailCatchall(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('catchall_id');
+        $primary_id = $this->extractParameter('catchall_id');
         $this->wsResponse = $this->ws()->mail_catchall_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailCatchall()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailCatchall(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('catchall_id');
+        $primary_id = $this->extractParameter('catchall_id');
         $this->wsResponse = $this->ws()->mail_catchall_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailCatchall()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailCatchall(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('catchall_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('catchall_id');
         $this->wsResponse = $this->ws()->mail_catchall_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailDomain(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_domain_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailDomain(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('domain_id');
+        $primary_id = $this->extractParameter('domain_id');
         $this->wsResponse = $this->ws()->mail_domain_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailDomain(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('domain_id');
+        $primary_id = $this->extractParameter('domain_id');
         $this->wsResponse = $this->ws()->mail_domain_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailDomainByDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailDomainByDomain(): ISPConfigWS
     {
-        $domain           = $this->extractParameter('domain_name');
+        $domain = $this->extractParameter('domain_name');
         $this->wsResponse = $this->ws()->mail_domain_get_by_domain($this->sessionId, $domain);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailDomain(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('domain_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('domain_id');
         $this->wsResponse = $this->ws()->mail_domain_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailFetchMail()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailFetchMail(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_fetchmail_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailFetchmal()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailFetchmal(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('fetchmail_id');
+        $primary_id = $this->extractParameter('fetchmail_id');
         $this->wsResponse = $this->ws()->mail_fetchmail_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailFetchmail()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailFetchmail(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('fetchmail_id');
+        $primary_id = $this->extractParameter('fetchmail_id');
         $this->wsResponse = $this->ws()->mail_fetchmail_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailFetchmail()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailFetchmail(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('fetchmail_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('fetchmail_id');
         $this->wsResponse = $this->ws()->mail_fetchmail_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailForward()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailForward(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_forward_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailForward()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailForward(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('forward_id');
+        $primary_id = $this->extractParameter('forward_id');
         $this->wsResponse = $this->ws()->mail_forward_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailForward()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailForward(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('forward_id');
+        $primary_id = $this->extractParameter('forward_id');
         $this->wsResponse = $this->ws()->mail_forward_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailForward()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailForward(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('forward_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('forward_id');
         $this->wsResponse = $this->ws()->mail_forward_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailinglist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailinglist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_mailinglist_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailinglist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailinglist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('mailinglist_id');
+        $primary_id = $this->extractParameter('mailinglist_id');
         $this->wsResponse = $this->ws()->mail_mailinglist_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailinglist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailinglist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('mailinglist_id');
+        $primary_id = $this->extractParameter('mailinglist_id');
         $this->wsResponse = $this->ws()->mail_mailinglist_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailinglist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailinglist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('mailinglist_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('mailinglist_id');
         $this->wsResponse = $this->ws()->mail_mailinglist_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailPolicy()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailPolicy(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_policy_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailPolicy()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailPolicy(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('policy_id');
+        $primary_id = $this->extractParameter('policy_id');
         $this->wsResponse = $this->ws()->mail_policy_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailPolicy()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailPolicy(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('policy_id');
+        $primary_id = $this->extractParameter('policy_id');
         $this->wsResponse = $this->ws()->mail_policy_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailPolicy()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailPolicy(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('policy_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('policy_id');
         $this->wsResponse = $this->ws()->mail_policy_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addSpamfilterBlacklist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addSpamfilterBlacklist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_blacklist_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteSpamfilterBlacklist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteSpamfilterBlacklist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('spamfilterblacklist_id');
+        $primary_id = $this->extractParameter('spamfilterblacklist_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_blacklist_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getSpamfilterBlacklist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getSpamfilterBlacklist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('spamfilterblacklist_id');
+        $primary_id = $this->extractParameter('spamfilterblacklist_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_blacklist_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateSpamfilterBlacklist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateSpamfilterBlacklist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('spamfilterblacklist_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('spamfilterblacklist_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_blacklist_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addSpamfilterUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addSpamfilterUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_user_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteSpamfilterUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteSpamfilterUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('spamfilteruser_id');
+        $primary_id = $this->extractParameter('spamfilteruser_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_user_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getSpamfilterUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getSpamfilterUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('spamfilteruser_id');
+        $primary_id = $this->extractParameter('spamfilteruser_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_user_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-
-    /**
-     * @return $this
-     */
-    public function updateSpamfilterUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateSpamfilterUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('spamfilteruser_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('spamfilteruser_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_user_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addSpamfilterWhitelist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addSpamfilterWhitelist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_whitelist_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteSpamfilterWhitelist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteSpamfilterWhitelist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('spamfilterwhitelist_id');
+        $primary_id = $this->extractParameter('spamfilterwhitelist_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_whitelist_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getSpamfilterWhitelist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getSpamfilterWhitelist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('spamfilterwhitelist_id');
+        $primary_id = $this->extractParameter('spamfilterwhitelist_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_whitelist_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateSpamfilterWhitelist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateSpamfilterWhitelist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('spamfilterwhitelist_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('spamfilterwhitelist_id');
         $this->wsResponse = $this->ws()->mail_spamfilter_whitelist_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailTransport()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailTransport(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_transport_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailTransport()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailTransport(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('transport_id');
+        $primary_id = $this->extractParameter('transport_id');
         $this->wsResponse = $this->ws()->mail_transport_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailTransport()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailTransport(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('transport_id');
+        $primary_id = $this->extractParameter('transport_id');
         $this->wsResponse = $this->ws()->mail_transport_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailTransport()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailTransport(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('transport_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('transport_id');
         $this->wsResponse = $this->ws()->mail_transport_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailuser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailuser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_user_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('user_id');
+        $primary_id = $this->extractParameter('user_id');
         $this->wsResponse = $this->ws()->mail_user_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('user_id');
+        $primary_id = $this->extractParameter('user_id');
         $this->wsResponse = $this->ws()->mail_user_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('user_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('user_id');
         $this->wsResponse = $this->ws()->mail_user_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailUserFilter()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailUserFilter(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_user_filter_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailUserfilter()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailUserfilter(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('userfilter_id');
+        $primary_id = $this->extractParameter('userfilter_id');
         $this->wsResponse = $this->ws()->mail_user_filter_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailUserFilter()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailUserFilter(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('userfilter_id');
+        $primary_id = $this->extractParameter('userfilter_id');
         $this->wsResponse = $this->ws()->mail_user_filter_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailUserfilter()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailUserfilter(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('userfilter_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('userfilter_id');
         $this->wsResponse = $this->ws()->mail_user_filter_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addMailWhitelist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addMailWhitelist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->mail_whitelist_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteMailWhitelist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteMailWhitelist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('whitelist_id');
+        $primary_id = $this->extractParameter('whitelist_id');
         $this->wsResponse = $this->ws()->mail_whitelist_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getMailWhitelist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getMailWhitelist(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('whitelist_id');
+        $primary_id = $this->extractParameter('whitelist_id');
         $this->wsResponse = $this->ws()->mail_whitelist_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateMailWhitelist()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateMailWhitelist(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('whitelist_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('whitelist_id');
         $this->wsResponse = $this->ws()->mail_whitelist_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getServer()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getServer(): ISPConfigWS
     {
-        $server_id        = $this->extractParameter('server_id');
+        $server_id = $this->extractParameter('server_id');
         $this->wsResponse = $this->ws()->server_get($this->sessionId, $server_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getServerByIp()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getServerByIp(): ISPConfigWS
     {
-        $ip_address       = $this->extractParameter('ip_address');
+        $ip_address = $this->extractParameter('ip_address');
         $this->wsResponse = $this->ws()->server_get_serverid_by_ip($this->sessionId, $ip_address);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addCron()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addCron(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->sites_cron_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteCron()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteCron(): ISPConfigWS
     {
-        $cron_id          = $this->extractParameter('cron_id');
+        $cron_id = $this->extractParameter('cron_id');
         $this->wsResponse = $this->ws()->sites_cron_delete($this->sessionId, $cron_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getCron()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getCron(): ISPConfigWS
     {
-        $cron_id          = $this->extractParameter('cron_id');
+        $cron_id = $this->extractParameter('cron_id');
         $this->wsResponse = $this->ws()->sites_cron_get($this->sessionId, $cron_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateCron()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateCron(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $cron_id          = $this->extractParameter('cron_id');
+        $client_id = $this->extractParameter('client_id');
+        $cron_id = $this->extractParameter('cron_id');
         $this->wsResponse = $this->ws()->sites_cron_update($this->sessionId, $client_id, $cron_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addDatabase()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addDatabase(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->sites_database_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteDatabase()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteDatabase(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('database_id');
+        $primary_id = $this->extractParameter('database_id');
         $this->wsResponse = $this->ws()->sites_database_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getDatabase()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getDatabase(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('database_id');
+        $primary_id = $this->extractParameter('database_id');
         $this->wsResponse = $this->ws()->sites_database_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getDatabasesByUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getDatabasesByUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->sites_database_get_all_by_user($this->sessionId, $client_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateDatabase()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateDatabase(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('database_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('database_id');
         $this->wsResponse = $this->ws()->sites_database_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addDatabaseUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addDatabaseUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->sites_database_user_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteDatabaseUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteDatabaseUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('databaseuser_id');
+        $primary_id = $this->extractParameter('databaseuser_id');
         $this->wsResponse = $this->ws()->sites_database_user_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getDatabaseUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getDatabaseUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('databaseuser_id');
+        $primary_id = $this->extractParameter('databaseuser_id');
         $this->wsResponse = $this->ws()->sites_database_user_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateDatabaseUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateDatabaseUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('databaseuser_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('databaseuser_id');
         $this->wsResponse = $this->ws()->sites_database_user_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addFtpUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addFtpUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->sites_ftp_user_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteFtpUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteFtpUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('ftpuser_id');
+        $primary_id = $this->extractParameter('ftpuser_id');
         $this->wsResponse = $this->ws()->sites_ftp_user_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getFtpUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getFtpUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('ftpuser_id');
+        $primary_id = $this->extractParameter('ftpuser_id');
         $this->wsResponse = $this->ws()->sites_ftp_user_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateFtpUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateFtpUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('ftpuser_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('ftpuser_id');
         $this->wsResponse = $this->ws()->sites_ftp_user_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addShellUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addShellUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->sites_shell_user_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteShellUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteShellUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('shelluser_id');
+        $primary_id = $this->extractParameter('shelluser_id');
         $this->wsResponse = $this->ws()->sites_shell_user_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getShellUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getShellUser(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('shelluser_id');
+        $primary_id = $this->extractParameter('shelluser_id');
         $this->wsResponse = $this->ws()->sites_shell_user_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateShellUser()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateShellUser(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('shelluser_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('shelluser_id');
         $this->wsResponse = $this->ws()->sites_shell_user_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addAliasDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addAliasDomain(): ISPConfigWS
     {
         $client_id = $this->extractParameter('client_id');
 
         $this->wsResponse = $this->ws()->sites_web_aliasdomain_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteAliasDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteAliasDomain(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('aliasdomain_id');
+        $primary_id = $this->extractParameter('aliasdomain_id');
         $this->wsResponse = $this->ws()->sites_web_aliasdomain_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getAliasDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getAliasDomain(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('aliasdomain_id');
+        $primary_id = $this->extractParameter('aliasdomain_id');
         $this->wsResponse = $this->ws()->sites_web_aliasdomain_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateAliasDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateAliasDomain(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('aliasdomain_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('aliasdomain_id');
         $this->wsResponse = $this->ws()->sites_web_aliasdomain_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addWebDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addWebDomain(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->sites_web_domain_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteWebDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteWebDomain(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('domain_id');
+        $primary_id = $this->extractParameter('domain_id');
         $this->wsResponse = $this->ws()->sites_web_domain_delete($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getWebDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getWebDomain(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('domain_id');
+        $primary_id = $this->extractParameter('domain_id');
         $this->wsResponse = $this->ws()->sites_web_domain_get($this->sessionId, $primary_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function setWebDomainStatus()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function setWebDomainStatus(): ISPConfigWS
     {
-        $primary_id       = $this->extractParameter('domain_id');
-        $status           = $this->extractParameter('status');
+        $primary_id = $this->extractParameter('domain_id');
+        $status = $this->extractParameter('status');
         $this->wsResponse = $this->ws()->sites_web_domain_set_status($this->sessionId, $primary_id, $status);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateWebDomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateWebDomain(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $primary_id       = $this->extractParameter('domain_id');
+        $client_id = $this->extractParameter('client_id');
+        $primary_id = $this->extractParameter('domain_id');
         $this->wsResponse = $this->ws()->sites_web_domain_update($this->sessionId, $client_id, $primary_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function addWebSubdomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function addWebSubdomain(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
+        $client_id = $this->extractParameter('client_id');
         $this->wsResponse = $this->ws()->sites_web_subdomain_add($this->sessionId, $client_id, $this->params);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function deleteWebsubdomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function deleteWebsubdomain(): ISPConfigWS
     {
-        $subdomain_id     = $this->extractParameter('subdomain_id');
+        $subdomain_id = $this->extractParameter('subdomain_id');
         $this->wsResponse = $this->ws()->sites_web_subdomain_delete($this->sessionId, $subdomain_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function getWebSubdomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function getWebSubdomain(): ISPConfigWS
     {
-        $subdomain_id     = $this->extractParameter('subdomain_id');
+        $subdomain_id = $this->extractParameter('subdomain_id');
         $this->wsResponse = $this->ws()->sites_web_subdomain_get($this->sessionId, $subdomain_id);
+
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function updateWebSubdomain()
+  /**
+   * @return $this
+   * @throws \SoapFault
+   * @throws \SoapFault
+   */
+    public function updateWebSubdomain(): ISPConfigWS
     {
-        $client_id        = $this->extractParameter('client_id');
-        $subdomain_id     = $this->extractParameter('subdomain_id');
+        $client_id = $this->extractParameter('client_id');
+        $subdomain_id = $this->extractParameter('subdomain_id');
         $this->wsResponse = $this->ws()->sites_web_subdomain_update($this->sessionId, $client_id, $subdomain_id, $this->params);
+
         return $this;
     }
 
