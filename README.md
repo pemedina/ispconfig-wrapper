@@ -6,6 +6,8 @@ A simple wrapper for ispconfig3 remote API.
 
 Designed to interoperate with ISPConfig 3, it aims to provide an expressive yet simple interface to perform all actions provided by the API.
 
+[![Latest Stable Version](http://poser.pugx.org/pemedina/ispconfig-wrapper/v?style=for-the-badge)](https://packagist.org/packages/pemedina/ispconfig-wrapper) [![Total Downloads](http://poser.pugx.org/pemedina/ispconfig-wrapper/downloads?style=for-the-badge)](https://packagist.org/packages/pemedina/ispconfig-wrapper) [![Latest Unstable Version](http://poser.pugx.org/pemedina/ispconfig-wrapper/v/unstable?style=for-the-badge)](https://packagist.org/packages/pemedina/ispconfig-wrapper) [![License](http://poser.pugx.org/pemedina/ispconfig-wrapper/license)](https://packagist.org/packages/pemedina/ispconfig-wrapper) [![PHP Version Require](http://poser.pugx.org/pemedina/ispconfig-wrapper/require/php?style=for-the-badge)](https://packagist.org/packages/pemedina/ispconfig-wrapper)
+
 ## Requirements
 
 * PHP >= 5.3.0 (with [soap](http://se2.php.net/soap) support)
